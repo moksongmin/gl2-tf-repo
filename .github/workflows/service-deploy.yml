@@ -1,72 +1,72 @@
-name: Service Deploy
+# name: Service Deploy
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "services/**"
-      - ".github/workflows/service-deploy.yml"
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - "services/**"
+#       - ".github/workflows/service-deploy.yml"
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: "Target environment"
+#         required: true
+#         type: choice
+#         options:
+#           - dev
+#           - prod
 
-permissions:
-  id-token: write
-  contents: read
+# permissions:
+#   id-token: write
+#   contents: read
 
-env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+# env:
+#   AWS_REGION: ${{ vars.AWS_REGION }}
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - user-management
-          - device-management
-    outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - uses: aws-actions/amazon-ecr-login@v2
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service }}
-          tags: |
-            type=sha
-      - uses: docker/build-push-action@v6
-        with:
-          context: services/${{ matrix.service }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+# jobs:
+#   build-and-push:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         service:
+#           - user-management
+#           - device-management
+#     outputs:
+#       image_tag: ${{ steps.meta.outputs.version }}
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+#           aws-region: ${{ env.AWS_REGION }}
+#       - uses: aws-actions/amazon-ecr-login@v2
+#       - id: meta
+#         uses: docker/metadata-action@v5
+#         with:
+#           images: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ matrix.service }}
+#           tags: |
+#             type=sha
+#       - uses: docker/build-push-action@v6
+#         with:
+#           context: services/${{ matrix.service }}
+#           push: true
+#           tags: ${{ steps.meta.outputs.tags }}
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform/environments/${{ github.event.inputs.environment || 'dev' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.8.5
-      - run: terraform init
-      - run: terraform apply -auto-approve -var='service_images={user_management="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/user-management:sha-${{ github.sha }}",device_management="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/device-management:sha-${{ github.sha }}"}'
+#   deploy:
+#     needs: build-and-push
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         working-directory: terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+#           aws-region: ${{ env.AWS_REGION }}
+#       - uses: hashicorp/setup-terraform@v3
+#         with:
+#           terraform_version: 1.8.5
+#       - run: terraform init
+#       - run: terraform apply -auto-approve -var='service_images={user_management="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/user-management:sha-${{ github.sha }}",device_management="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/device-management:sha-${{ github.sha }}"}'
